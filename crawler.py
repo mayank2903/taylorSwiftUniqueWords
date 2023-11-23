@@ -71,7 +71,7 @@ def get_song_name(url):
 
 def export_all_songs_word_freq(all_song_words_list):
     word_freq = generate_dict(all_song_words_list)
-    file_name = "all_song_freq.csv"
+    file_name = "word_frequencies/all_song_freq.csv"
     export_dict_to_csv(file_name, word_freq)
 
 
