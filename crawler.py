@@ -14,7 +14,7 @@ HEADERS = {
     'User-Agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/601.3.9 (KHTML, like Gecko) Version/9.0.2 Safari/601.3.9"}
 
 
-def get_all_song_urls(all_songs_page_url):
+def get_all_song_lyrics_urls(all_songs_page_url):
     r = requests.get(all_songs_page_url, headers=HEADERS)
     soup = BeautifulSoup(r.content, 'html5lib')
     time.sleep(10)
@@ -57,7 +57,7 @@ def generate_dict(word_list):
 
 def export_per_song_word_freq(url, word_list):
     song_name = get_song_name(url)
-    print("exporting metrics of song: ", song_name)
+    print(f"Exporting metrics of song: {song_name}")
     word_freq = generate_dict(word_list)
 
     file_name = PARENT_DIR + song_name + ".csv"
@@ -88,44 +88,54 @@ def export_dict_to_csv(file_name, word_freq):
     os.chmod(file_name, 0o444)
 
 
+def get_possibly_recorded_song_word_list(url):
+    song_file = PARENT_DIR + get_song_name(url) + ".csv"
+
+    word_list = []
+    try:
+        if os.path.exists(song_file):
+            print(f"{song_file} already exported. Skipping..")
+            with open(song_file, 'r') as song_csv:
+                reader = csv.reader(song_csv)
+                for row in reader:
+                    word = row[0]
+                    count = int(row[1])
+                    word_list = word_list + ([word] * count)
+                song_csv.close()
+    except FileNotFoundError:
+        pass
+    return word_list
+
+
 def main():
-    all_song_urls = get_all_song_urls(URL)
-    number_of_songs = len(all_song_urls)
+    song_lyrics_page_urls = get_all_song_lyrics_urls(URL)
+    number_of_songs = len(song_lyrics_page_urls)
     print(f"{number_of_songs} songs found")
 
     # Sorting links by the song names. Helps track how far we are in crawling.
-    all_song_urls = sorted(all_song_urls, reverse=True)
-    print(all_song_urls)
+    song_lyrics_page_urls = sorted(song_lyrics_page_urls, reverse=True)
+    print(song_lyrics_page_urls)
 
     # Collect all words of all songs by the artist.
     all_song_words = []
     i = 0
-    for url in all_song_urls:
+    for song_lyrics_page_url in song_lyrics_page_urls:
         i += 1
-        print(f"[{i}/{number_of_songs}] Getting lyrics for: ", url)
+        print(f"[{i}/{number_of_songs}] Getting lyrics for: ", song_lyrics_page_url)
 
-        # check if metrics for this song already exported.
-        # todo: extract this into its own method.
-        word_list = []
-        song_file = PARENT_DIR + get_song_name(url) + ".csv"
-        try:
-            if os.path.exists(song_file):
-                print(f"{song_file} already exported. Skipping..")
-                with open(song_file, 'r') as song_csv:
-                    reader = csv.reader(song_csv)
-                    for row in reader:
-                        word = row[0]
-                        count = int(row[1])
-                        word_list = word_list + [word] * count
-                    song_csv.close()
-        except FileNotFoundError:
-            # export per-song stats
-            word_list = get_word_list_for_song(url)
-            export_per_song_word_freq(url, word_list)
+        # Check if metrics for this song already exported.
+        word_list = get_possibly_recorded_song_word_list(song_lyrics_page_url)
 
+        # If nothing recorded yet, crawl through lyrics page.
+        if len(word_list) == 0:
+            # Get and export per-song stats
+            word_list = get_word_list_for_song(song_lyrics_page_url)
+            export_per_song_word_freq(song_lyrics_page_url, word_list)
+
+        # Add result to all song words list.
         all_song_words = all_song_words + word_list
 
-    # export all songs' collective stats
+    # Export all songs' collective stats
     print ('Exporting all song frequencies...')
     export_all_songs_word_freq(all_song_words)
     return all_song_words
