@@ -76,12 +76,16 @@ def export_all_songs_word_freq(all_song_words_list):
     export_dict_to_csv(file_name, word_freq)
 
 
-# todo: make this export readonly csv ?
 def export_dict_to_csv(file_name, word_freq):
+    # Populate the file.
     with open(file_name, 'w') as csv_file:
         writer = csv.writer(csv_file)
         for key, value in word_freq.items():
             writer.writerow([key, value])
+    csv_file.close()
+
+    # Make the file read-only.
+    os.chmod(file_name, 0o444)
 
 
 def main():
