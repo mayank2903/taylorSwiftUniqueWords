@@ -9,6 +9,7 @@ import csv
 
 URL = "https://www.azlyrics.com/t/taylorswift.html"
 PARENT_URL = "https://www.azlyrics.com"
+PARENT_DIR = "word_frequencies/"
 HEADERS = {
     'User-Agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/601.3.9 (KHTML, like Gecko) Version/9.0.2 Safari/601.3.9"}
 
@@ -59,7 +60,7 @@ def export_per_song_word_freq(url, word_list):
     print("exporting metrics of song: ", song_name)
     word_freq = generate_dict(word_list)
 
-    file_name = song_name + ".csv"
+    file_name = PARENT_DIR + song_name + ".csv"
     export_dict_to_csv(file_name, word_freq)
 
 
@@ -71,7 +72,7 @@ def get_song_name(url):
 
 def export_all_songs_word_freq(all_song_words_list):
     word_freq = generate_dict(all_song_words_list)
-    file_name = "word_frequencies/all_song_freq.csv"
+    file_name = PARENT_DIR + "all_song_freq.csv"
     export_dict_to_csv(file_name, word_freq)
 
 
@@ -101,20 +102,27 @@ def main():
 
         # check if metrics for this song already exported.
         # todo: extract this into its own method.
-        song_file = get_song_name(url) + ".csv"
+        word_list = []
+        song_file = PARENT_DIR + get_song_name(url) + ".csv"
         try:
             if os.path.exists(song_file):
                 print(f"{song_file} already exported. Skipping..")
-                continue
+                with open(song_file, 'r') as song_csv:
+                    reader = csv.reader(song_csv)
+                    for row in reader:
+                        word = row[0]
+                        count = int(row[1])
+                        word_list = word_list + [word] * count
+                    song_csv.close()
         except FileNotFoundError:
-            pass
+            # export per-song stats
+            word_list = get_word_list_for_song(url)
+            export_per_song_word_freq(url, word_list)
 
-        word_list = get_word_list_for_song(url)
         all_song_words = all_song_words + word_list
-        # export per-song stats
-        export_per_song_word_freq(url, word_list)
 
     # export all songs' collective stats
+    print ('Exporting all song frequencies...')
     export_all_songs_word_freq(all_song_words)
     return all_song_words
 
