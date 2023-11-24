@@ -1,18 +1,25 @@
 import os.path
 import re
+
+import nltk
 import requests
 from bs4 import BeautifulSoup
 import time
 import random
 from collections import defaultdict
 import csv
+from nltk.corpus import stopwords
 
 URL = "https://www.azlyrics.com/t/taylorswift.html"
 PARENT_URL = "https://www.azlyrics.com"
 PARENT_DIR = "word_frequencies/"
 HEADERS = {
-    'User-Agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/601.3.9 (KHTML, like Gecko) Version/9.0.2 Safari/601.3.9"}
+    "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36,gzip(gfe)"}
 
+
+# todo: make it a parallel crawler. i can parallely fetch all song lyrics.
+# but do this only after metrics are converted into charts well
+# since this does not change the data to be fetched.
 
 def get_all_song_lyrics_urls(all_songs_page_url):
     r = requests.get(all_songs_page_url, headers=HEADERS)
@@ -29,9 +36,9 @@ def canonicalize_url(relative_path):
         return PARENT_URL + relative_path
 
 
-def get_word_list_for_song(url):
+def get_word_list_for_song(url, stop_words):
     r = requests.get(url=url, headers=HEADERS)
-    time.sleep(random.randint(5, 10))
+    time.sleep(random.randint(30, 40))
     soup = BeautifulSoup(r.content, 'html.parser')
     # Find section which has song lyrics.
     lyrics = soup.find_all(lambda tag: tag.name == 'div' and not tag.attrs)[0].text
@@ -41,7 +48,8 @@ def get_word_list_for_song(url):
     for word in non_sanitized_words:
         for i in range(len(symbols)):
             word = word.replace(symbols[i], '')
-        sanitized_words.append(word)
+        if word not in stop_words:
+            sanitized_words.append(word)
     return sanitized_words
 
 
@@ -119,6 +127,8 @@ def main():
     # Collect all words of all songs by the artist.
     all_song_words = []
     i = 0
+    nltk.download('stopwords')
+    stop_words = set(stopwords.words('english'))
     for song_lyrics_page_url in song_lyrics_page_urls:
         i += 1
         print(f"[{i}/{number_of_songs}] Getting lyrics for: ", song_lyrics_page_url)
@@ -129,16 +139,16 @@ def main():
         # If nothing recorded yet, crawl through lyrics page.
         if len(word_list) == 0:
             # Get and export per-song stats
-            word_list = get_word_list_for_song(song_lyrics_page_url)
+            word_list = get_word_list_for_song(song_lyrics_page_url, stop_words)
             export_per_song_word_freq(song_lyrics_page_url, word_list)
 
         # Add result to all song words list.
         all_song_words = all_song_words + word_list
 
-    # Export all songs' collective stats
-    print ('Exporting all song frequencies...')
-    export_all_songs_word_freq(all_song_words)
-    return all_song_words
+    # Export all songs' collective stats, provided we managed to crawl over all songs.
+    if i == number_of_songs != 0:
+        print('Exporting all song frequencies...')
+        export_all_songs_word_freq(all_song_words)
 
 
 if __name__ == "__main__":
