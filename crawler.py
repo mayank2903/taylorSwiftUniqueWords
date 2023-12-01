@@ -1,6 +1,7 @@
 import os.path
 import re
-
+import sys
+import argparse
 import nltk
 import requests
 from bs4 import BeautifulSoup
@@ -9,19 +10,25 @@ import random
 from collections import defaultdict
 import csv
 from nltk.corpus import stopwords
+import contractions
 
 # Note: Change URL and PARENT_DIR for getting results of any new artist.
-URL = "https://www.azlyrics.com/e/edsheeran.html"
+# todo: add cmdline argument so that i can run script in parallel.
+URL_FORMAT = "https://www.azlyrics.com/%s/%s.html"
 PARENT_URL = "https://www.azlyrics.com"
-PARENT_DIR = "word_frequencies/edsheeran/"
+PARENT_DIR_FORMAT = "word_frequencies/%s/"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36,gzip(gfe)"}
 
 
 class LyricsCrawler:
 
-    def __init__(self, url):
-        self.url = url
+    def __init__(self, artist_name):
+        self.url = URL_FORMAT % (artist_name[0], artist_name)
+        print('URL:', self.url)
+        self.artist_name = artist_name
+        self.parent_dir = PARENT_DIR_FORMAT % (artist_name)
+        print('PARENT_DIR:', self.parent_dir)
 
     def get_all_song_lyrics_urls(self, all_songs_page_url):
         r = requests.get(all_songs_page_url, headers=HEADERS)
@@ -52,10 +59,14 @@ class LyricsCrawler:
         non_sanitized_words = lyrics.lower().split()
         sanitized_words = []
         for word in non_sanitized_words:
+            # Remove most special symbols
             for i in range(len(symbols)):
                 word = word.replace(symbols[i], '')
-            if word not in stop_words:
-                sanitized_words.append(word)
+            # Expand contractions like "i'm", "i'll", so that they can also be removed using stopwords.
+            expanded_words = contractions.fix(word).split()
+            for word in expanded_words:
+                if word not in stop_words:
+                    sanitized_words.append(word)
         return sanitized_words
 
     def generate_dict(self, word_list):
@@ -71,7 +82,7 @@ class LyricsCrawler:
         print(f"Exporting metrics of song: {song_name}")
         word_freq = self.generate_dict(word_list)
 
-        file_name = PARENT_DIR + song_name + ".csv"
+        file_name = PARENT_DIR_FORMAT + song_name + ".csv"
         self.export_dict_to_csv(file_name, word_freq)
 
     def get_song_name(self, url):
@@ -81,7 +92,7 @@ class LyricsCrawler:
 
     def export_all_songs_word_freq(self, all_song_words_list):
         word_freq = self.generate_dict(all_song_words_list)
-        file_name = PARENT_DIR + "all_song_freq.csv"
+        file_name = PARENT_DIR_FORMAT + "all_song_freq.csv"
         self.export_dict_to_csv(file_name, word_freq)
 
     def export_dict_to_csv(self, file_name, word_freq):
@@ -89,8 +100,8 @@ class LyricsCrawler:
         word_freq = dict(sorted(word_freq.items(), key=lambda item: item[1], reverse=True))
 
         # First ensure directory exists
-        if not os.path.exists(PARENT_DIR):
-            os.makedirs(PARENT_DIR)
+        if not os.path.exists(PARENT_DIR_FORMAT):
+            os.makedirs(PARENT_DIR_FORMAT)
 
         # Populate the file.
         with open(file_name, 'w') as csv_file:
@@ -103,7 +114,7 @@ class LyricsCrawler:
         os.chmod(file_name, 0o444)
 
     def get_possibly_recorded_song_word_list(self, url):
-        song_file = PARENT_DIR + self.get_song_name(url) + ".csv"
+        song_file = PARENT_DIR_FORMAT + self.get_song_name(url) + ".csv"
 
         word_list = []
         try:
@@ -156,5 +167,15 @@ class LyricsCrawler:
 
 
 if __name__ == "__main__":
-    crawler = LyricsCrawler(URL)
-    crawler.crawl()
+    # Define cmdline flag for artist name.
+    parser = argparse.ArgumentParser(description='Process lyrics of given artist')
+    parser.add_argument('-a', '--artist', help='Artist name whose lyrics to process')
+    args = parser.parse_args()
+    if not args.artist:
+        print('No artist name provided')
+    else:
+        # Instantiate crawler with cmdline flags, and run
+        artist_name = str(args.artist).lower().replace(" ", "")
+        print('Artist name:', artist_name)
+        crawler = LyricsCrawler(artist_name=artist_name)
+        crawler.crawl()

@@ -8,3 +8,4 @@ Format for `PARENT_DIR`: You can just put artistNameWithoutSpace again, or whate
 
 # Output
 It exports csv files per song, as well as an `all_song_freq.csv` file, each of which contain a sorted order of unique words used, in descending order of their frequency.
+It makes sure that pronouns, articles and prepositions are not counted, to avoid noise in the list!
