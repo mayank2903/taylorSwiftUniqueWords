@@ -12,8 +12,6 @@ import csv
 from nltk.corpus import stopwords
 import contractions
 
-# Note: Change URL and PARENT_DIR for getting results of any new artist.
-# todo: add cmdline argument so that i can run script in parallel.
 URL_FORMAT = "https://www.azlyrics.com/%s/%s.html"
 PARENT_URL = "https://www.azlyrics.com"
 PARENT_DIR_FORMAT = "word_frequencies/%s/"
