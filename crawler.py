@@ -1,6 +1,6 @@
 import os.path
 import re
-import sys
+import matplotlib.pyplot as plt
 import argparse
 import nltk
 import requests
@@ -22,11 +22,13 @@ HEADERS = {
 class LyricsCrawler:
 
     def __init__(self, artist_name):
-        self.url = URL_FORMAT % (artist_name[0], artist_name)
-        print('URL:', self.url)
         self.artist_name = artist_name
-        self.parent_dir = PARENT_DIR_FORMAT % (artist_name)
-        print('PARENT_DIR:', self.parent_dir)
+
+        self.url = URL_FORMAT % (self.artist_name[0], self.artist_name)
+        print('URL:', self.url)
+
+        self.artist_dir = PARENT_DIR_FORMAT % self.artist_name
+        print('PARENT_DIR:', self.artist_dir)
 
     def get_all_song_lyrics_urls(self, all_songs_page_url):
         r = requests.get(all_songs_page_url, headers=HEADERS)
@@ -80,8 +82,8 @@ class LyricsCrawler:
         print(f"Exporting metrics of song: {song_name}")
         word_freq = self.generate_dict(word_list)
 
-        file_name = PARENT_DIR_FORMAT + song_name + ".csv"
-        self.export_dict_to_csv(file_name, word_freq)
+        file_name = self.artist_dir + song_name + ".csv"
+        self.export_dict_to_csv_and_plot(file_name, word_freq)
 
     def get_song_name(self, url):
         url = url.removesuffix(".html")
@@ -90,29 +92,44 @@ class LyricsCrawler:
 
     def export_all_songs_word_freq(self, all_song_words_list):
         word_freq = self.generate_dict(all_song_words_list)
-        file_name = PARENT_DIR_FORMAT + "all_song_freq.csv"
-        self.export_dict_to_csv(file_name, word_freq)
+        file_name = self.artist_dir + "all_song_freq.csv"
+        self.export_dict_to_csv_and_plot(file_name, word_freq)
 
-    def export_dict_to_csv(self, file_name, word_freq):
+    def export_dict_to_csv_and_plot(self, file_name, word_freq):
         # Sort word frequencies in descending order.
         word_freq = dict(sorted(word_freq.items(), key=lambda item: item[1], reverse=True))
 
         # First ensure directory exists
-        if not os.path.exists(PARENT_DIR_FORMAT):
-            os.makedirs(PARENT_DIR_FORMAT)
+        if not os.path.exists(self.artist_dir):
+            os.makedirs(self.artist_dir)
 
         # Populate the file.
-        with open(file_name, 'w') as csv_file:
-            writer = csv.writer(csv_file)
-            for key, value in word_freq.items():
-                writer.writerow([key, value])
-        csv_file.close()
+        try:
+            with open(file_name, 'w') as csv_file:
+                writer = csv.writer(csv_file)
+                for key, value in word_freq.items():
+                    writer.writerow([key, value])
+            csv_file.close()
+        except OSError:
+            pass
 
         # Make the file read-only.
         os.chmod(file_name, 0o444)
 
+        # Plot the top 50 words.
+        self.plot_top_fifty_used_words(list(word_freq.items())[:50])
+
+    def plot_top_fifty_used_words(self, word_freq):
+        for x, y in word_freq:
+            plt.bar(x, y, color='g', width=0.72)
+            plt.xticks(rotation=90)
+            plt.xlabel('Word', fontweight='bold')
+            plt.ylabel('Frequency', fontweight='bold')
+            plt.title('Top 50 Words Across All Songs - %s ' % self.artist_name)
+        plt.show()
+
     def get_possibly_recorded_song_word_list(self, url):
-        song_file = PARENT_DIR_FORMAT + self.get_song_name(url) + ".csv"
+        song_file = self.artist_dir + self.get_song_name(url) + ".csv"
 
         word_list = []
         try:
